@@ -55,6 +55,24 @@ export interface ConnectedWallet {
 }
 
 export async function connectWallet(): Promise<ConnectedWallet> {
+  // DEV-ONLY test wallet: lets the full UI flow run headlessly on TESTNET
+  // (EXP-010 checklist automation). Hard-gated: dev build + testnet only;
+  // stripped from production bundles by the import.meta.env.DEV check.
+  if (import.meta.env.DEV && !IS_MAINNET && import.meta.env.VITE_TEST_KEY) {
+    const { privateKeyToAccount } = await import("viem/accounts");
+    const account = privateKeyToAccount(import.meta.env.VITE_TEST_KEY as `0x${string}`);
+    const walletClient = createWalletClient({
+      account,
+      transport: custom({
+        // Minimal EIP-1193 shim; the SDK only signs typed data via the account.
+        request: async () => {
+          throw new Error("test wallet: RPC not available");
+        },
+      } as never),
+    });
+    return { address: account.address, walletClient };
+  }
+
   const eth = (window as unknown as { ethereum?: unknown }).ethereum;
   if (!eth) {
     throw new Error(
