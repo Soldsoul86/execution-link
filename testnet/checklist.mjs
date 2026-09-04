@@ -72,11 +72,11 @@ async function expectReject(name, fn, pattern) {
     return { ok: false };
   } catch (e) {
     const msg = errMsg(e);
-    if (isFundingError(msg)) {
+    const matched = pattern.test(msg);
+    if (!matched && isFundingError(msg)) {
       record(name, "BLOCKED_FUNDING", { error: msg });
       return { ok: false, blocked: true };
     }
-    const matched = pattern.test(msg);
     record(name, matched ? "PASS" : "FAIL", { rejectedWith: msg, expectedPattern: String(pattern) });
     return { ok: matched };
   }
