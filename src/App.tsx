@@ -8,6 +8,7 @@ import {
   REPO_URL,
 } from "./config";
 import { getTrade } from "./trades";
+import Landing from "./Landing";
 import { resolveVariant, VARIANTS } from "./variants";
 import { track } from "./track";
 import {
@@ -36,7 +37,11 @@ type Step =
 
 export default function App() {
   const params = new URLSearchParams(window.location.search);
-  const trade = getTrade(params.get("t"));
+  const tParam = params.get("t");
+  const trade = getTrade(tParam);
+  // "See your name on it" preview: display-only, DEMO cards only, watermarked.
+  const asHandle = trade?.id.startsWith("demo-") ? params.get("as") : null;
+  const displayHandle = asHandle || trade?.kolHandle;
   const variant = useMemo(() => VARIANTS[resolveVariant()], []);
   const [asset, setAsset] = useState<AssetInfo | null>(null);
   const [assetError, setAssetError] = useState<string | null>(null);
@@ -55,6 +60,7 @@ export default function App() {
     getAssetInfo(trade.coin).then(setAsset, (e: Error) => setAssetError(e.message));
   }, []);
 
+  if (!tParam) return <Landing />;
   if (!trade) {
     return (
       <main className="card">
@@ -63,6 +69,7 @@ export default function App() {
           This page only executes trades from its built-in registry. The link you
           followed does not match any registered trade.
         </p>
+        <p><a href="./">About these links</a></p>
       </main>
     );
   }
@@ -129,14 +136,20 @@ export default function App() {
   }
 
   const busy = step.k === "connecting" || step.k === "approving" || step.k === "executing";
+  const hasProvider = typeof (window as unknown as { ethereum?: unknown }).ethereum !== "undefined"
+    || (import.meta.env.DEV && !!import.meta.env.VITE_TEST_KEY);
+  const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 
   return (
     <main className="card">
       {!IS_MAINNET && <div className="banner">TESTNET — no real funds involved</div>}
 
       <header>
-        {trade.kolHandle && variant.showKolShare && (
-          <p className="kol">Trade created by {trade.kolHandle}</p>
+        {displayHandle && (variant.showKolShare || asHandle) && (
+          <p className="kol">
+            Trade created by {displayHandle}
+            {asHandle && <span className="preview-badge">PREVIEW — not a real endorsement</span>}
+          </p>
         )}
         <h1>
           {trade.closeOnly
@@ -210,9 +223,9 @@ export default function App() {
             <dd>up to 0.045% taker (less at higher tiers) — paid to Hyperliquid</dd>
             <dt>Our builder fee</dt>
             <dd>{BUILDER_FEE_TENTHS_BP / 10} bps ({(BUILDER_FEE_TENTHS_BP / 1000).toFixed(3)}%) — approval capped at 0.05%, revocable</dd>
-            {variant.showKolShare && trade.kolHandle && (
+            {(variant.showKolShare || asHandle) && displayHandle && (
               <>
-                <dt>{trade.kolHandle}'s share</dt>
+                <dt>{displayHandle}'s share</dt>
                 <dd>50% of our builder fee — disclosed, not hidden</dd>
               </>
             )}
@@ -229,7 +242,22 @@ export default function App() {
       )}
 
       <section className="actions">
-        {!wallet && (
+        {!wallet && !hasProvider && isMobile && (
+          <>
+            <a
+              className="btn primary block"
+              href={`https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}${window.location.search}`}
+            >
+              Open in MetaMask app
+            </a>
+            <p className="muted center">
+              On mobile, wallets live in their own apps — this button reopens this exact
+              page inside MetaMask's browser so you can sign safely. (Rabby/other wallet
+              apps: paste this page's link into the wallet's built-in browser.)
+            </p>
+          </>
+        )}
+        {!wallet && (hasProvider || !isMobile) && (
           <button onClick={onConnect} disabled={busy || !asset}>
             {step.k === "connecting" ? "Connecting…" : "Connect wallet"}
           </button>
