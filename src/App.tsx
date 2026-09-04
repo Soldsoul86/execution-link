@@ -41,6 +41,10 @@ export default function App() {
   const [wallet, setWallet] = useState<ConnectedWallet | null>(null);
   const [needsApproval, setNeedsApproval] = useState<boolean | null>(null);
   const [step, setStep] = useState<Step>({ k: "idle" });
+  const [usd, setUsd] = useState<number>(trade?.usdDefault ?? 0);
+  const clampedUsd = trade
+    ? Math.min(Math.max(usd || trade.usdMin, trade.usdMin), trade.usdMax)
+    : 0;
 
   useEffect(() => {
     if (!trade) return;
@@ -60,7 +64,7 @@ export default function App() {
     );
   }
 
-  const preview = asset ? orderPreview(asset, trade.coin, trade.isBuy, trade.usdNotional) : null;
+  const preview = asset ? orderPreview(asset, trade.coin, trade.isBuy, clampedUsd) : null;
 
   async function onConnect() {
     setStep({ k: "connecting" });
@@ -97,7 +101,7 @@ export default function App() {
       if (trade!.leverage) {
         await setLeverage(wallet, asset.index, trade!.leverage, trade!.isCross ?? true);
       }
-      const fill = await executeTrade(wallet, asset, trade!.isBuy, trade!.usdNotional);
+      const fill = await executeTrade(wallet, asset, trade!.isBuy, clampedUsd);
       setStep({ k: "filled", fill });
       track("order_filled", {
         tradeId: trade!.id,
@@ -131,7 +135,7 @@ export default function App() {
           <p className="kol">Trade created by {trade.kolHandle}</p>
         )}
         <h1>
-          {trade.coin}-PERP · {trade.isBuy ? "LONG" : "SHORT"} · ${trade.usdNotional.toLocaleString()}
+          {trade.coin}-PERP · {trade.isBuy ? "LONG" : "SHORT"}
         </h1>
         <p className="venue">Venue: {NETWORK_LABEL}</p>
         {trade.note && <p className="note">{trade.note}</p>}
@@ -142,6 +146,21 @@ export default function App() {
       {preview && (
         <section className="preview" aria-label="Exact order you will sign">
           <h2>The exact order you will sign</h2>
+          <label className="sizerow">
+            Your size (USD):{" "}
+            <input
+              type="number"
+              min={trade.usdMin}
+              max={trade.usdMax}
+              step="1"
+              value={usd}
+              onChange={(e) => setUsd(Number(e.target.value))}
+              disabled={busy || step.k === "filled"}
+            />
+            <span className="bounds">
+              min ${trade.usdMin.toLocaleString()} · max ${trade.usdMax.toLocaleString()}
+            </span>
+          </label>
           <dl>
             <dt>Market</dt><dd>{preview.coin}-PERP</dd>
             <dt>Side</dt><dd>{preview.side}</dd>

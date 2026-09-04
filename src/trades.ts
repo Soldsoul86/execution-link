@@ -8,8 +8,11 @@ export interface TradeDef {
   coin: string;
   /** true = long/buy, false = short/sell */
   isBuy: boolean;
-  /** Order size in USD notional (converted to base size at current mid). */
-  usdNotional: number;
+  /** Default order size in USD notional; the TRADER chooses the final size. */
+  usdDefault: number;
+  /** Bounds for the trader-chosen size (registry-locked). */
+  usdMin: number;
+  usdMax: number;
   /** Optional leverage to set before the order. Omit = keep account setting. */
   leverage?: number;
   /** Cross margin (true) or isolated (false). Only used when leverage is set. */
@@ -27,7 +30,9 @@ export const TRADES: TradeDef[] = [
     id: "demo-btc-long",
     coin: "BTC",
     isBuy: true,
-    usdNotional: 100,
+    usdDefault: 100,
+    usdMin: 12,
+    usdMax: 250000,
     kolId: "",
     note: "Demo trade for testnet dry-runs (EXP-010 checklist).",
   },
@@ -35,7 +40,9 @@ export const TRADES: TradeDef[] = [
     id: "demo-eth-short",
     coin: "ETH",
     isBuy: false,
-    usdNotional: 100,
+    usdDefault: 100,
+    usdMin: 12,
+    usdMax: 250000,
     kolId: "",
     note: "Demo short for failure-mode testing.",
   },

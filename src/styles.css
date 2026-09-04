@@ -30,3 +30,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 footer { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 0.8rem; color: var(--muted); }
 footer code { font-size: 0.75rem; word-break: break-all; }
 a { color: var(--accent); }
+.sizerow { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 0.95rem; }
+.sizerow input { width: 120px; padding: 6px 8px; font-size: 1rem; background: #10151b; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+.sizerow .bounds { color: var(--muted); font-size: 0.8rem; }
