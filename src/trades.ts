@@ -41,7 +41,7 @@ export const TRADES: TradeDef[] = [
     tpPct: 2,
     slPct: 1,
     kolId: "",
-    note: "Demo trade for testnet dry-runs (EXP-010 checklist).",
+    note: "Demo link. Trade executes in YOUR account at YOUR chosen size.",
   },
   {
     id: "demo-btc-exit",
@@ -52,7 +52,7 @@ export const TRADES: TradeDef[] = [
     usdMax: 0,
     closeOnly: true,
     kolId: "",
-    note: "EXIT link demo: closes your open BTC position (reduce-only).",
+    note: "Closes your open BTC position (reduce-only). Nothing else.",
   },
   {
     id: "demo-eth-short",
@@ -62,7 +62,7 @@ export const TRADES: TradeDef[] = [
     usdMin: 12,
     usdMax: 250000,
     kolId: "",
-    note: "Demo short for failure-mode testing.",
+    note: "Demo link. Trade executes in YOUR account at YOUR chosen size.",
   },
 ];
 
