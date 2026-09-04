@@ -30,3 +30,16 @@ Full run: 20/21 PASS + S9 redesigned after discovery (log: checklist-log.json).
 - Wallet-prompt screenshots (approval shows readable fields; order shows a
   digest) — capture during the user's own MetaMask testnet pass.
 - Publishing the repo + REPO_URL.
+
+## Bracket verification (completed later, 2026-09-04)
+- normalTpsl bracket VERIFIED end-to-end on testnet: entry IOC filled
+  (0.00018 BTC @ 82854), TP and SL legs accepted as "waitingForTrigger"
+  and visible as resting trigger orders (TP @ 84511, SL @ 81197);
+  position closed and residual triggers cancelled cleanly.
+- Response shape note: trigger-leg statuses are the STRING
+  "waitingForTrigger", not objects — only statuses[0] (the entry) carries
+  the fill object our UI reads.
+- Oracle-band observation: succeeded at ~2.44% ask/oracle skew with entry
+  at best ask; earlier failure was at >2.5% and with mid+0.5% pricing.
+  Band edge sits near ~2.5% on testnet BTC; mainnet oracle tracks mid so
+  the band is a non-issue there.
