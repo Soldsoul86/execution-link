@@ -13,6 +13,8 @@ export interface TradeDef {
   /** Bounds for the trader-chosen size (registry-locked). */
   usdMin: number;
   usdMax: number;
+  /** EXIT link: closes the follower's entire position in this coin (reduce-only). */
+  closeOnly?: boolean;
   /** Optional take-profit / stop-loss as % from entry (the KOL's full plan). */
   tpPct?: number;
   slPct?: number;
@@ -40,6 +42,17 @@ export const TRADES: TradeDef[] = [
     slPct: 1,
     kolId: "",
     note: "Demo trade for testnet dry-runs (EXP-010 checklist).",
+  },
+  {
+    id: "demo-btc-exit",
+    coin: "BTC",
+    isBuy: false, // ignored for closeOnly
+    usdDefault: 0,
+    usdMin: 0,
+    usdMax: 0,
+    closeOnly: true,
+    kolId: "",
+    note: "EXIT link demo: closes your open BTC position (reduce-only).",
   },
   {
     id: "demo-eth-short",

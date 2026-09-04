@@ -17,6 +17,7 @@ import {
   connectWallet,
   executeTrade,
   getAssetInfo,
+  getPosition,
   orderPreview,
   setLeverage,
   type AssetInfo,
@@ -43,6 +44,7 @@ export default function App() {
   const [needsApproval, setNeedsApproval] = useState<boolean | null>(null);
   const [step, setStep] = useState<Step>({ k: "idle" });
   const [usd, setUsd] = useState<number>(trade?.usdDefault ?? 0);
+  const [posSzi, setPosSzi] = useState<number | null>(null);
   const clampedUsd = trade
     ? Math.min(Math.max(usd || trade.usdMin, trade.usdMin), trade.usdMax)
     : 0;
@@ -74,6 +76,7 @@ export default function App() {
       setWallet(w);
       const approved = await approvedBuilderFee(w.address);
       setNeedsApproval(approved < BUILDER_FEE_TENTHS_BP);
+      if (trade!.closeOnly) setPosSzi(await getPosition(w.address, trade!.coin));
       setStep({ k: "connected" });
       track("wallet_connected", { tradeId: trade!.id, variant: variant.id, address: w.address });
     } catch (e) {
@@ -136,7 +139,9 @@ export default function App() {
           <p className="kol">Trade created by {trade.kolHandle}</p>
         )}
         <h1>
-          {trade.coin}-PERP · {trade.isBuy ? "LONG" : "SHORT"}
+          {trade.closeOnly
+            ? `EXIT: close ${trade.coin}-PERP position`
+            : `${trade.coin}-PERP · ${trade.isBuy ? "LONG" : "SHORT"}`}
         </h1>
         <p className="venue">Venue: {NETWORK_LABEL}</p>
         {trade.note && <p className="note">{trade.note}</p>}
@@ -144,7 +149,23 @@ export default function App() {
 
       {assetError && <p className="error">Market data unavailable: {assetError}</p>}
 
-      {preview && (
+      {trade.closeOnly && wallet && (
+        <section className="preview" aria-label="Position to close">
+          <h2>Your position</h2>
+          {posSzi === null && <p>Loading…</p>}
+          {posSzi === 0 && <p>No open {trade.coin} position on this account — nothing to close.</p>}
+          {posSzi !== null && posSzi !== 0 && (
+            <dl>
+              <dt>Position</dt>
+              <dd>{posSzi > 0 ? "LONG" : "SHORT"} {Math.abs(posSzi)} {trade.coin}</dd>
+              <dt>Action</dt>
+              <dd>Reduce-only close (cannot open or increase any position)</dd>
+            </dl>
+          )}
+        </section>
+      )}
+
+      {!trade.closeOnly && preview && (
         <section className="preview" aria-label="Exact order you will sign">
           <h2>The exact order you will sign</h2>
           <label className="sizerow">
@@ -220,9 +241,30 @@ export default function App() {
               : "Approve builder fee (one-time, gasless, capped 0.05%)"}
           </button>
         )}
-        {wallet && needsApproval === false && step.k !== "filled" && (
+        {wallet && needsApproval === false && step.k !== "filled" && !trade.closeOnly && (
           <button className="execute" onClick={onExecute} disabled={busy}>
             {step.k === "executing" ? "Executing…" : "Sign & execute this trade"}
+          </button>
+        )}
+        {wallet && needsApproval === false && step.k !== "filled" && trade.closeOnly && (
+          <button
+            className="execute"
+            disabled={busy || !posSzi}
+            onClick={async () => {
+              if (!wallet || !asset) return;
+              setStep({ k: "executing" });
+              track("order_submitted", { tradeId: trade!.id, variant: variant.id, address: wallet.address, detail: "exit" });
+              try {
+                const fill = await closePosition(wallet, asset, trade!.coin);
+                setStep({ k: "filled", fill });
+                track("order_filled", { tradeId: trade!.id, variant: variant.id, address: wallet.address, detail: `exit sz=${fill.totalSz}` });
+              } catch (e) {
+                fail(e);
+                track("order_failed", { tradeId: trade!.id, variant: variant.id, address: wallet?.address, detail: String(e) });
+              }
+            }}
+          >
+            {step.k === "executing" ? "Closing…" : "Sign & close my position"}
           </button>
         )}
       </section>

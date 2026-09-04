@@ -208,6 +208,13 @@ export async function executeTrade(
   throw new Error("Order was not filled (IOC expired without a match).");
 }
 
+/** Signed position size for a coin (positive long, negative short, 0 flat). */
+export async function getPosition(user: `0x${string}`, coin: string): Promise<number> {
+  const st = await infoClient.clearinghouseState({ user });
+  const ap = st.assetPositions.find((x) => x.position.coin === coin);
+  return ap ? Number(ap.position.szi) : 0;
+}
+
 /** Emergency close: reduce-only IOC for the user's whole position in this asset. */
 export async function closePosition(w: ConnectedWallet, asset: AssetInfo, coin: string): Promise<FillResult> {
   const st = await infoClient.clearinghouseState({ user: w.address });
