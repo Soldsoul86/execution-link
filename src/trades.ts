@@ -13,6 +13,9 @@ export interface TradeDef {
   /** Bounds for the trader-chosen size (registry-locked). */
   usdMin: number;
   usdMax: number;
+  /** Optional take-profit / stop-loss as % from entry (the KOL's full plan). */
+  tpPct?: number;
+  slPct?: number;
   /** Optional leverage to set before the order. Omit = keep account setting. */
   leverage?: number;
   /** Cross margin (true) or isolated (false). Only used when leverage is set. */
@@ -33,6 +36,8 @@ export const TRADES: TradeDef[] = [
     usdDefault: 100,
     usdMin: 12,
     usdMax: 250000,
+    tpPct: 2,
+    slPct: 1,
     kolId: "",
     note: "Demo trade for testnet dry-runs (EXP-010 checklist).",
   },

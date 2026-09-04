@@ -114,6 +114,9 @@ export interface FillResult {
   avgPx: string;
   oid: number;
   restingOnly: boolean;
+  /** Entry filled but TP/SL legs were rejected — position has NO protection. */
+  nakedPosition?: boolean;
+  bracketError?: string;
 }
 
 export async function setLeverage(
@@ -125,25 +128,70 @@ export async function setLeverage(
   await exchangeClient(w).updateLeverage({ asset: assetIndex, isCross, leverage });
 }
 
-/** Marketable-limit IOC with our builder code attached. */
+/** Marketable-limit IOC with our builder code attached.
+ * With tpPct/slPct: entry + TP + SL in one grouped action (normalTpsl).
+ * VERIFIED CAVEAT (testnet probes): grouping is NOT atomic — the entry can
+ * fill while trigger legs reject (e.g. oracle price-band). We detect that and
+ * report nakedPosition so the UI can offer an immediate close. */
 export async function executeTrade(
   w: ConnectedWallet,
   asset: AssetInfo,
+  coin: string,
   isBuy: boolean,
   usdNotional: number,
+  tpPct?: number,
+  slPct?: number,
 ): Promise<FillResult> {
+  const posSzi = async () => {
+    const st = await infoClient.clearinghouseState({ user: w.address });
+    const ap = st.assetPositions.find((x) => x.position.coin === coin);
+    return ap ? Number(ap.position.szi) : 0;
+  };
+  const preSzi = tpPct || slPct ? await posSzi() : 0;
   const rawPx = isBuy ? asset.mid * (1 + SLIPPAGE) : asset.mid * (1 - SLIPPAGE);
   const p = roundPrice(rawPx, asset.szDecimals);
   const s = roundSize(usdNotional / asset.mid, asset.szDecimals);
   if (Number(s) <= 0) throw new Error("Order size rounds to zero for this asset.");
 
-  const res = await exchangeClient(w).order({
-    orders: [
-      { a: asset.index, b: isBuy, p, s, r: false, t: { limit: { tif: "Ioc" } } },
-    ],
-    grouping: "na",
-    builder: { b: BUILDER_ADDRESS, f: BUILDER_FEE_TENTHS_BP },
-  });
+  const orders: Parameters<ReturnType<typeof exchangeClient>["order"]>[0]["orders"][number][] = [
+    { a: asset.index, b: isBuy, p, s, r: false, t: { limit: { tif: "Ioc" } } },
+  ];
+  const dir = isBuy ? 1 : -1;
+  if (tpPct) {
+    const trig = roundPrice(asset.mid * (1 + (dir * tpPct) / 100), asset.szDecimals);
+    orders.push({ a: asset.index, b: !isBuy, p: trig, s, r: true, t: { trigger: { isMarket: true, triggerPx: trig, tpsl: "tp" } } });
+  }
+  if (slPct) {
+    const trig = roundPrice(asset.mid * (1 - (dir * slPct) / 100), asset.szDecimals);
+    orders.push({ a: asset.index, b: !isBuy, p: trig, s, r: true, t: { trigger: { isMarket: true, triggerPx: trig, tpsl: "sl" } } });
+  }
+
+  let res;
+  try {
+    res = await exchangeClient(w).order({
+      orders,
+      grouping: orders.length > 1 ? "normalTpsl" : "na",
+      builder: { b: BUILDER_ADDRESS, f: BUILDER_FEE_TENTHS_BP },
+    });
+  } catch (e) {
+    // Non-atomicity guard (verified on testnet): the entry can fill while
+    // trigger legs reject. Compare this coin's position before vs after.
+    if (orders.length > 1) {
+      const postSzi = await posSzi();
+      const delta = postSzi - preSzi;
+      if ((isBuy && delta > 0) || (!isBuy && delta < 0)) {
+        return {
+          totalSz: Math.abs(delta).toFixed(asset.szDecimals),
+          avgPx: "-",
+          oid: 0,
+          restingOnly: false,
+          nakedPosition: true,
+          bracketError: e instanceof Error ? e.message : String(e),
+        };
+      }
+    }
+    throw e;
+  }
 
   const status = res.response.data.statuses[0];
   if (status && "filled" in status) {
@@ -158,6 +206,24 @@ export async function executeTrade(
     return { totalSz: "0", avgPx: "-", oid: status.resting.oid, restingOnly: true };
   }
   throw new Error("Order was not filled (IOC expired without a match).");
+}
+
+/** Emergency close: reduce-only IOC for the user's whole position in this asset. */
+export async function closePosition(w: ConnectedWallet, asset: AssetInfo, coin: string): Promise<FillResult> {
+  const st = await infoClient.clearinghouseState({ user: w.address });
+  const pos = st.assetPositions.find((ap) => ap.position.coin === coin);
+  if (!pos || Number(pos.position.szi) === 0) throw new Error("No open position to close.");
+  const szi = Number(pos.position.szi);
+  const isBuy = szi < 0;
+  const p = roundPrice(isBuy ? asset.mid * (1 + SLIPPAGE) : asset.mid * (1 - SLIPPAGE), asset.szDecimals);
+  const res = await exchangeClient(w).order({
+    orders: [{ a: asset.index, b: isBuy, p, s: Math.abs(szi).toFixed(asset.szDecimals), r: true, t: { limit: { tif: "Ioc" } } }],
+    grouping: "na",
+    builder: { b: BUILDER_ADDRESS, f: BUILDER_FEE_TENTHS_BP },
+  });
+  const status = res.response.data.statuses[0];
+  if (status && "filled" in status) return { totalSz: status.filled.totalSz, avgPx: status.filled.avgPx, oid: status.filled.oid, restingOnly: false };
+  throw new Error("Close order did not fill — manage the position on Hyperliquid directly.");
 }
 
 /** Human-readable order preview shown ABOVE the sign button (§ trust design). */

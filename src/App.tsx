@@ -13,6 +13,7 @@ import { track } from "./track";
 import {
   approveBuilder,
   approvedBuilderFee,
+  closePosition,
   connectWallet,
   executeTrade,
   getAssetInfo,
@@ -101,7 +102,7 @@ export default function App() {
       if (trade!.leverage) {
         await setLeverage(wallet, asset.index, trade!.leverage, trade!.isCross ?? true);
       }
-      const fill = await executeTrade(wallet, asset, trade!.isBuy, clampedUsd);
+      const fill = await executeTrade(wallet, asset, trade!.coin, trade!.isBuy, clampedUsd, trade!.tpPct, trade!.slPct);
       setStep({ k: "filled", fill });
       track("order_filled", {
         tradeId: trade!.id,
@@ -167,6 +168,12 @@ export default function App() {
             <dt>Size</dt><dd>{preview.size}</dd>
             <dt>Limit price (incl. 0.5% slippage guard)</dt><dd>{preview.limitPrice}</dd>
             <dt>Time in force</dt><dd>{preview.tif}</dd>
+            {trade.tpPct && (
+              <><dt>Take profit</dt><dd>{trade.isBuy ? "+" : "-"}{trade.tpPct}% from entry (auto-placed with the trade)</dd></>
+            )}
+            {trade.slPct && (
+              <><dt>Stop loss</dt><dd>{trade.isBuy ? "-" : "+"}{trade.slPct}% from entry (auto-placed with the trade)</dd></>
+            )}
             {trade.leverage && (
               <><dt>Leverage</dt><dd>{trade.leverage}x ({trade.isCross ?? true ? "cross" : "isolated"})</dd></>
             )}
@@ -220,7 +227,36 @@ export default function App() {
         )}
       </section>
 
-      {step.k === "filled" && (
+      {step.k === "filled" && step.fill.nakedPosition && (
+        <section className="result error">
+          <h2>⚠ Position opened WITHOUT stop-loss protection</h2>
+          <p>
+            Your entry filled ({step.fill.totalSz} {trade.coin}), but the venue rejected the
+            take-profit/stop-loss legs ({step.fill.bracketError}). Your position is currently
+            unprotected.
+          </p>
+          <button
+            className="execute"
+            onClick={async () => {
+              if (!wallet || !asset) return;
+              try {
+                await closePosition(wallet, asset, trade!.coin);
+                setStep({ k: "error", message: "Position closed. Nothing remains open." });
+              } catch (e) {
+                fail(e);
+              }
+            }}
+          >
+            Close this position now
+          </button>
+          <p>
+            Or manage it yourself on{" "}
+            <a href={`${HL_APP_URL}/trade`} target="_blank" rel="noreferrer">Hyperliquid</a>.
+          </p>
+        </section>
+      )}
+
+      {step.k === "filled" && !step.fill.nakedPosition && (
         <section className="result">
           <h2>Filled ✓</h2>
           {step.fill.restingOnly ? (
