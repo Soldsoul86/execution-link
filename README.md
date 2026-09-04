@@ -36,3 +36,9 @@ Trust-copy variants: `?v=a|b|c|d` (sticky). Variant definitions in `src/variants
 ## Honest limitations (tell users the truth)
 - Hyperliquid order signatures show a cryptographic digest in the wallet, not order fields. Mitigations: full order preview on-page, open source, client-side only, and the fill is verifiable on Hyperliquid's own app seconds later.
 - Funds sit in the user's own Hyperliquid account (not "in your wallet") — the copy says exactly that.
+
+## Mainnet status
+- Live at: https://soldsoul86.github.io/execution-link/ (deployed via Actions on push)
+- Builder address: `0x30Ceb82817044099DeE59a401756Da3b290Fe525` (set as repo variable)
+- NOTE: builder approvals fail venue-side until this address holds >=100 USDC in
+  Hyperliquid MAINNET perps (verified inclusive minimum).
