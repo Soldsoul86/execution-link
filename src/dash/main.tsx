@@ -7,3 +7,7 @@ createRoot(document.getElementById("root")!).render(
     <Dash />
   </StrictMode>,
 );
+
+if (!import.meta.env.DEV && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
