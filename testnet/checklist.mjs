@@ -161,9 +161,23 @@ if (s5.ok) {
     await step(`S8 cycle ${i}/5 open`, () => marketableOrder({ buy: true }));
     await step(`S8 cycle ${i}/5 close`, () => marketableOrder({ buy: false, reduceOnly: true }));
   }
-  // S9 — deliberate failure: absurd size must fail with margin error
-  await expectReject("S9 deliberate margin failure ($10M order)", () =>
-    marketableOrder({ usd: 10_000_000 }), /margin|insufficient|size|exceeds/i);
+  // S9 — deliberate failure. VERIFIED SEMANTICS (2026-09-04): IOC orders do NOT
+  // hard-reject on excess size — they fill what margin/book allows and cancel
+  // the rest. Hard rejection ("Insufficient margin to place order") only
+  // occurs for orders that would REST beyond margin. So the test uses GTC.
+  await exch.updateLeverage({ asset: (await info.meta()).universe.findIndex(u => u.name === "BTC"), isCross: true, leverage: 1 });
+  await expectReject("S9 deliberate margin failure (GTC $5k at 1x)", async () => {
+    const [meta, mids] = await Promise.all([info.meta(), info.allMids()]);
+    const idx = meta.universe.findIndex((u) => u.name === "BTC");
+    const szDec = meta.universe[idx].szDecimals;
+    const mid = Number(mids["BTC"]);
+    const p = round(mid * 0.8, szDec);
+    return exch.order({
+      orders: [{ a: idx, b: true, p, s: (5000 / (mid * 0.8)).toFixed(szDec), r: false, t: { limit: { tif: "Gtc" } } }],
+      grouping: "na",
+      builder: { b: builder.address, f: BUILDER_FEE_F },
+    });
+  }, /insufficient margin/i);
 } else {
   record("S8 five cycles", "BLOCKED_FUNDING", { need: "testnet USDC on trader address" });
   record("S9 deliberate margin failure", "BLOCKED_FUNDING", { need: "testnet USDC on trader address" });
