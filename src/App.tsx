@@ -105,7 +105,7 @@ export default function App() {
       if (trade!.leverage) {
         await setLeverage(wallet, asset.index, trade!.leverage, trade!.isCross ?? true);
       }
-      const fill = await executeTrade(wallet, asset, trade!.coin, trade!.isBuy, clampedUsd, trade!.tpPct, trade!.slPct);
+      const fill = await executeTrade(wallet, asset, trade!.coin, trade!.isBuy, clampedUsd, trade!.tpPct, trade!.slPct, trade!.id, trade!.kolId);
       setStep({ k: "filled", fill });
       track("order_filled", {
         tradeId: trade!.id,
@@ -255,7 +255,7 @@ export default function App() {
               setStep({ k: "executing" });
               track("order_submitted", { tradeId: trade!.id, variant: variant.id, address: wallet.address, detail: "exit" });
               try {
-                const fill = await closePosition(wallet, asset, trade!.coin);
+                const fill = await closePosition(wallet, asset, trade!.coin, trade!.id, trade!.kolId);
                 setStep({ k: "filled", fill });
                 track("order_filled", { tradeId: trade!.id, variant: variant.id, address: wallet.address, detail: `exit sz=${fill.totalSz}` });
               } catch (e) {
@@ -282,7 +282,7 @@ export default function App() {
             onClick={async () => {
               if (!wallet || !asset) return;
               try {
-                await closePosition(wallet, asset, trade!.coin);
+                await closePosition(wallet, asset, trade!.coin, trade!.id, trade!.kolId);
                 setStep({ k: "error", message: "Position closed. Nothing remains open." });
               } catch (e) {
                 fail(e);

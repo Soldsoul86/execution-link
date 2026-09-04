@@ -32,3 +32,13 @@ Nothing. You share links to trades you were posting anyway.
 
 ## Exit
 Stop sharing links whenever you want. Nothing persists.
+
+## Your console (live)
+Every link you share feeds one dashboard that answers the question no
+Telegram channel can: **"what happened to my audience after I gave them my
+trade?"** Traders, volume, your earnings in real time, per-call funnels,
+and a follow-up queue (new / active / high-volume / dormant / repeat) with
+suggested check-ins — you message people yourself, where they already talk
+to you; nothing is ever auto-sent. Your public profile page turns it into a
+verifiable track record: timestamped calls + on-chain fills, not screenshots.
+Demo: https://soldsoul86.github.io/execution-link/dash.html?demo=1

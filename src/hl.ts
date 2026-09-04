@@ -3,6 +3,7 @@
 
 import * as hl from "@nktkas/hyperliquid";
 import { createWalletClient, custom, type WalletClient } from "viem";
+import { makeCloid } from "./attribution";
 import {
   APPROVAL_MAX_FEE_RATE,
   BUILDER_ADDRESS,
@@ -141,7 +142,10 @@ export async function executeTrade(
   usdNotional: number,
   tpPct?: number,
   slPct?: number,
+  tradeId = "",
+  kolId = "",
 ): Promise<FillResult> {
+  const cloid = () => makeCloid(tradeId, kolId);
   const posSzi = async () => {
     const st = await infoClient.clearinghouseState({ user: w.address });
     const ap = st.assetPositions.find((x) => x.position.coin === coin);
@@ -154,16 +158,16 @@ export async function executeTrade(
   if (Number(s) <= 0) throw new Error("Order size rounds to zero for this asset.");
 
   const orders: Parameters<ReturnType<typeof exchangeClient>["order"]>[0]["orders"][number][] = [
-    { a: asset.index, b: isBuy, p, s, r: false, t: { limit: { tif: "Ioc" } } },
+    { a: asset.index, b: isBuy, p, s, r: false, t: { limit: { tif: "Ioc" } }, c: cloid() },
   ];
   const dir = isBuy ? 1 : -1;
   if (tpPct) {
     const trig = roundPrice(asset.mid * (1 + (dir * tpPct) / 100), asset.szDecimals);
-    orders.push({ a: asset.index, b: !isBuy, p: trig, s, r: true, t: { trigger: { isMarket: true, triggerPx: trig, tpsl: "tp" } } });
+    orders.push({ a: asset.index, b: !isBuy, p: trig, s, r: true, t: { trigger: { isMarket: true, triggerPx: trig, tpsl: "tp" } }, c: cloid() });
   }
   if (slPct) {
     const trig = roundPrice(asset.mid * (1 - (dir * slPct) / 100), asset.szDecimals);
-    orders.push({ a: asset.index, b: !isBuy, p: trig, s, r: true, t: { trigger: { isMarket: true, triggerPx: trig, tpsl: "sl" } } });
+    orders.push({ a: asset.index, b: !isBuy, p: trig, s, r: true, t: { trigger: { isMarket: true, triggerPx: trig, tpsl: "sl" } }, c: cloid() });
   }
 
   let res;
@@ -216,7 +220,7 @@ export async function getPosition(user: `0x${string}`, coin: string): Promise<nu
 }
 
 /** Emergency close: reduce-only IOC for the user's whole position in this asset. */
-export async function closePosition(w: ConnectedWallet, asset: AssetInfo, coin: string): Promise<FillResult> {
+export async function closePosition(w: ConnectedWallet, asset: AssetInfo, coin: string, tradeId = "", kolId = ""): Promise<FillResult> {
   const st = await infoClient.clearinghouseState({ user: w.address });
   const pos = st.assetPositions.find((ap) => ap.position.coin === coin);
   if (!pos || Number(pos.position.szi) === 0) throw new Error("No open position to close.");
@@ -224,7 +228,7 @@ export async function closePosition(w: ConnectedWallet, asset: AssetInfo, coin: 
   const isBuy = szi < 0;
   const p = roundPrice(isBuy ? asset.mid * (1 + SLIPPAGE) : asset.mid * (1 - SLIPPAGE), asset.szDecimals);
   const res = await exchangeClient(w).order({
-    orders: [{ a: asset.index, b: isBuy, p, s: Math.abs(szi).toFixed(asset.szDecimals), r: true, t: { limit: { tif: "Ioc" } } }],
+    orders: [{ a: asset.index, b: isBuy, p, s: Math.abs(szi).toFixed(asset.szDecimals), r: true, t: { limit: { tif: "Ioc" } }, c: makeCloid(tradeId, kolId) }],
     grouping: "na",
     builder: { b: BUILDER_ADDRESS, f: BUILDER_FEE_TENTHS_BP },
   });
