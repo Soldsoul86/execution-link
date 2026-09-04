@@ -25,6 +25,6 @@ export const HL_APP_URL = IS_MAINNET
   ? "https://app.hyperliquid.xyz"
   : "https://app.hyperliquid-testnet.xyz";
 
-export const REPO_URL = "https://github.com/REPLACE_ME/exp010"; // set after publishing
+export const REPO_URL = "https://github.com/Soldsoul86/execution-link";
 
 export const NETWORK_LABEL = IS_MAINNET ? "Hyperliquid" : "Hyperliquid TESTNET";
